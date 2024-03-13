@@ -20,7 +20,7 @@ class ConvexHullApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Convex Hull and Largest Inscribed Circle")
-        self.geometry("800x600")
+        self.geometry("1920x1080")
         self.create_widgets()
 
     def create_widgets(self):
