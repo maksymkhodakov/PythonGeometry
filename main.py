@@ -1,19 +1,13 @@
+import tkinter as tk
 import numpy as np
 import matplotlib.pyplot as plt
+from tkinter import simpledialog, Toplevel
+from matplotlib.figure import Figure
 from scipy.spatial import Voronoi, voronoi_plot_2d
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 
 def point_inside_polygon(point, polygon):
-    """
-    Check if a point is inside a polygon.
-
-    Parameters:
-        point (tuple): Coordinates of the point (x, y).
-        polygon (list of tuples): List of vertices of the polygon [(x1, y1), (x2, y2), ..., (xn, yn)].
-
-    Returns:
-        bool: True if the point is inside the polygon, False otherwise.
-    """
     x, y = point
     inside = False
     n = len(polygon)
@@ -31,18 +25,22 @@ def point_inside_polygon(point, polygon):
     return inside
 
 
-def distance(p1, p2):
-    """
-    Compute the Euclidean distance between two points.
-
-    Parameters:
-        p1 (tuple): First point coordinates (x1, y1).
-        p2 (tuple): Second point coordinates (x2, y2).
-
-    Returns:
-        float: Euclidean distance between the points.
-    """
-    return np.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
+def distance_point_to_segment(point, segment):
+    """Calculate the minimum distance from a point to a line segment."""
+    p1, p2 = np.array(segment[0]), np.array(segment[1])
+    p = np.array(point)
+    line_vec = p2 - p1
+    point_vec = p - p1
+    line_len = np.linalg.norm(line_vec)
+    line_unitvec = line_vec / line_len
+    p1_to_p = np.linalg.norm(point_vec)
+    projection = point_vec.dot(line_unitvec)
+    if projection < 0:
+        return p1_to_p
+    if projection > line_len:
+        return np.linalg.norm(p - p2)
+    projected_point = p1 + line_unitvec * projection
+    return np.linalg.norm(p - projected_point)
 
 
 def generate_star_polygon(N, inner_radius, outer_radius):
@@ -54,37 +52,57 @@ def generate_star_polygon(N, inner_radius, outer_radius):
     return np.array(vertices)
 
 
-N = int(input("Enter the number of points for the star polygon: "))
+def plot_polygon_and_circle(N, outer_radius=10, inner_radius=5):
+    # Generate star polygon and calculate Voronoi diagram
+    polygon_vertices = generate_star_polygon(N, inner_radius, outer_radius)
+    vor = Voronoi(polygon_vertices)
+    inside_vertices = [v for v in vor.vertices if point_inside_polygon(v, polygon_vertices)]
 
-outer_radius = 10
-inner_radius = 5
-polygon_vertices = generate_star_polygon(N, inner_radius, outer_radius)
+    # Find the maximum inscribed circle
+    max_area = 0
+    max_center = None
+    for vertex in inside_vertices:
+        distances = [distance_point_to_segment(vertex, (polygon_vertices[i], polygon_vertices[(i + 1) % N])) for i in
+                     range(N)]
+        radius = min(distances)
+        area = np.pi * radius ** 2
+        if area > max_area:
+            max_area = area
+            max_center = vertex
 
-vor = Voronoi(polygon_vertices)
+    # Create a new Tkinter window
+    new_window = Toplevel(ROOT)
+    new_window.title("Polygon Plot")
 
-inside_vertices = []
-for vertex in vor.vertices:
-    if point_inside_polygon(vertex, polygon_vertices):
-        inside_vertices.append(vertex)
+    # Create a Figure for Matplotlib
+    fig = Figure(figsize=(6, 4))
+    ax = fig.add_subplot(111)
 
-max_area = 0
-max_center = None
-for vertex in inside_vertices:
-    radius = min(distance(vertex, v) for v in polygon_vertices)
-    area = np.pi * radius ** 2
-    if area > max_area:
-        max_area = area
-        max_center = vertex
+    # Plotting
+    ax.plot(polygon_vertices[:, 0], polygon_vertices[:, 1], 'bo-')
+    voronoi_plot_2d(vor, ax=ax, show_vertices=False, line_colors='orange', line_width=2)
+    if max_center is not None:
+        circle = plt.Circle(max_center, np.sqrt(max_area / np.pi), color='red', alpha=0.5)
+        ax.add_patch(circle)
+    ax.set_xlim(min(polygon_vertices[:, 0]) - 1, max(polygon_vertices[:, 0]) + 1)
+    ax.set_ylim(min(polygon_vertices[:, 1]) - 1, max(polygon_vertices[:, 1]) + 1)
+    ax.set_title("Star-shaped Polygon, Voronoi Diagram, and Maximum Inscribed Circle by Area")
+    ax.grid(True)
 
-plt.figure(figsize=(8, 6))
-plt.plot(polygon_vertices[:, 0], polygon_vertices[:, 1], 'bo-')
-voronoi_plot_2d(vor, show_vertices=False, line_colors='orange', line_width=2)
-circle = plt.Circle(max_center, np.sqrt(max_area / np.pi), color='red', alpha=0.5)
-plt.gca().add_patch(circle)
-plt.xlim(min(polygon_vertices[:, 0]) - 1, max(polygon_vertices[:, 0]) + 1)
-plt.ylim(min(polygon_vertices[:, 1]) - 1, max(polygon_vertices[:, 1]) + 1)
-plt.title("Star-shaped Polygon, Voronoi Diagram, and Maximum Inscribed Circle by Area")
-plt.xlabel("X")
-plt.ylabel("Y")
-plt.grid(True)
-plt.show()
+    # Embedding the Matplotlib figure in the Tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=new_window)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+
+# Creating the UI
+ROOT = tk.Tk()
+ROOT.withdraw()
+# The input dialog
+USER_INP = simpledialog.askinteger(title="Star Polygon Generator",
+                                   prompt="Enter the number of points for the star polygon:")
+
+# Call the function with the user input
+if USER_INP:
+    plot_polygon_and_circle(USER_INP)
+    ROOT.mainloop()
