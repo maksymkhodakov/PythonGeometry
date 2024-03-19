@@ -49,46 +49,41 @@ def generate_star_polygon(N, inner_radius, outer_radius):
     angles = np.linspace(0, 2 * np.pi, 2 * N, endpoint=False)
     vertices = []
     for angle in angles:
-        vertices.append((outer_radius * np.cos(angle), outer_radius * np.sin(angle)))
-        vertices.append((inner_radius * np.cos(angle + np.pi / N), inner_radius * np.sin(angle + np.pi / N)))
+        r = outer_radius if angle % (2 * np.pi / N) == 0 else inner_radius
+        vertices.append((r * np.cos(angle), r * np.sin(angle)))
     return np.array(vertices)
 
 
-# User input for number of points
 N = int(input("Enter the number of points for the star polygon: "))
 
-# Generate random star-shaped polygon vertices
 outer_radius = 10
 inner_radius = 5
 polygon_vertices = generate_star_polygon(N, inner_radius, outer_radius)
 
-# Generate Voronoi diagram
 vor = Voronoi(polygon_vertices)
 
-# Find the Voronoi vertices within the polygon
 inside_vertices = []
 for vertex in vor.vertices:
     if point_inside_polygon(vertex, polygon_vertices):
         inside_vertices.append(vertex)
 
-# Find the maximum inscribed circle
-max_radius = 0
+max_area = 0
 max_center = None
 for vertex in inside_vertices:
     radius = min(distance(vertex, v) for v in polygon_vertices)
-    if radius > max_radius:
-        max_radius = radius
+    area = np.pi * radius ** 2
+    if area > max_area:
+        max_area = area
         max_center = vertex
 
-# Plot the polygon, Voronoi diagram, and maximum inscribed circle
 plt.figure(figsize=(8, 6))
-plt.plot(polygon_vertices[:, 0], polygon_vertices[:, 1], 'bo-')  # Plot polygon
-voronoi_plot_2d(vor, show_vertices=False, line_colors='orange', line_width=2)  # Plot Voronoi diagram
-circle = plt.Circle(max_center, max_radius, color='red', alpha=0.5)  # Maximum inscribed circle
+plt.plot(polygon_vertices[:, 0], polygon_vertices[:, 1], 'bo-')
+voronoi_plot_2d(vor, show_vertices=False, line_colors='orange', line_width=2)
+circle = plt.Circle(max_center, np.sqrt(max_area / np.pi), color='red', alpha=0.5)
 plt.gca().add_patch(circle)
 plt.xlim(min(polygon_vertices[:, 0]) - 1, max(polygon_vertices[:, 0]) + 1)
 plt.ylim(min(polygon_vertices[:, 1]) - 1, max(polygon_vertices[:, 1]) + 1)
-plt.title("Star-shaped Polygon, Voronoi Diagram, and Maximum Inscribed Circle")
+plt.title("Star-shaped Polygon, Voronoi Diagram, and Maximum Inscribed Circle by Area")
 plt.xlabel("X")
 plt.ylabel("Y")
 plt.grid(True)
